@@ -5,11 +5,7 @@ This repository contains code for training an RNN Transducer model for speech re
 ## Requirements
 
 ```
-requirements.txt
-pytorch
-pytorch-lightning
-torch.utils.data
-sentencepiece
+python setup.py
 ```
 
 ## Project Structure
