@@ -1,0 +1,27 @@
+# Bỏ qua cache Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Bỏ venv
+venv/
+ENV/
+env/
+.venv/
+
+# Bỏ model checkpoint/logs
+checkpoints/
+logs/
+*.log
+
+# Bỏ notebook checkpoint
+.ipynb_checkpoints/
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
+
+dataset/
+dataset/
+weights/phowhisper_small_encoder.pt
+*.ckpt
