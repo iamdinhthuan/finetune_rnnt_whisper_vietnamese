@@ -2,6 +2,7 @@ from audiomentations import (
     AddBackgroundNoise, AddGaussianNoise, Compose, OneOf, SomeOf,
     Gain, PitchShift, TimeStretch, Mp3Compression, Shift, PolarityInversion
 )
+import torchaudio.transforms as T
 
 from torch.utils.data import Dataset
 from loguru import logger
@@ -47,23 +48,24 @@ class AudioDataset(Dataset):
         self.device = 'cpu' # torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         if augment:
-            self.augmentation = Compose(  # chỉ 80 % sample được augment
+            # Audio-level augmentations (applied to waveform)
+            self.audio_augmentation = Compose(  # chỉ 80 % sample được augment
                 [
-                    Gain(min_gain_db=-10, max_gain_db=6, p=0.8),
+                    Gain(min_gain_db=-10, max_gain_db=6, p=0.6),  # Reduced probability
 
-                    PitchShift(min_semitones=-4, max_semitones=4, p=0.3),
+                    PitchShift(min_semitones=-4, max_semitones=4, p=0.2),  # Reduced
 
                     TimeStretch(min_rate=0.9, max_rate=1.1,
                                 leave_length_unchanged=False, p=0.2),
 
-                    Mp3Compression(p=0.3),
+                    Mp3Compression(p=0.2),  # Reduced
 
                     Shift(
                         min_shift=-0.2,
                         max_shift=0.2,
-                        shift_unit="fraction",  # mặc định đã là "fraction", ghi rõ cho tường minh
-                        rollover=False,  # giữ im lặng thay vì quấn đuôi audio (tùy ý)
-                        p=0.5,
+                        shift_unit="fraction",
+                        rollover=False,
+                        p=0.3,  # Reduced
                     ),
 
                     # ---------- Noise ---------------------------------------
@@ -71,24 +73,31 @@ class AudioDataset(Dataset):
                         [
                             AddGaussianNoise(min_amplitude=0.001,
                                              max_amplitude=0.010,
-                                             p=1.0),  # Gaussian luôn chạy khi nhánh này được chọn
+                                             p=1.0),
 
                             AddBackgroundNoise(
                                 sounds_path=[p for p in bg_noise_path if os.path.exists(p)],
-                                min_snr_db=8.0,  # SNR 8–20 dB thực tế hơn
-                                max_snr_db=20.0,
+                                min_snr_db=15.0,  # Higher SNR for cleaner training
+                                max_snr_db=25.0,
                                 noise_transform=PolarityInversion(),
-                                p=0.3  # hiếm hơn Gaussian
+                                p=0.2  # Reduced
                             ),
                         ],
-                        p=0.5  # chỉ 50 % sample có thêm noise
+                        p=0.3  # Reduced noise probability
                     ),
-                    # ---------------------------------------------------------
                 ],
-                p=0.8  # 20 % sample giữ nguyên
+                p=0.7  # 30% sample giữ nguyên
             )
+
+            # Spectrogram-level augmentations (SpecAugment)
+            self.freq_mask = T.FrequencyMasking(freq_mask_param=15)
+            self.time_mask = T.TimeMasking(time_mask_param=40)
+            self.spec_aug_prob = 0.5  # Probability of applying SpecAugment
         else:
-            self.augmentation = lambda samples, sample_rate: samples
+            self.audio_augmentation = lambda samples, sample_rate: samples
+            self.freq_mask = None
+            self.time_mask = None
+            self.spec_aug_prob = 0.0
     
     def __len__(self):
         return len(self.samples)
@@ -159,11 +168,22 @@ class AudioDataset(Dataset):
             offset=sample['offset'],
             duration=sample['duration']
         )
-        waveform = self.augmentation(samples=waveform, sample_rate=sample_rate)
+
+        # Apply audio-level augmentations
+        waveform = self.audio_augmentation(samples=waveform, sample_rate=sample_rate)
         transcript_ids = self.tokenizer.encode_as_ids(sample['text'])
 
         waveform, transcript_ids = torch.from_numpy(waveform), torch.tensor(transcript_ids)
         melspec = self.log_mel_spectrogram(waveform, self.config.audio.n_mels, 0, self.device)
+
+        # Apply spectrogram-level augmentations (SpecAugment)
+        if self.freq_mask is not None and torch.rand(1).item() < self.spec_aug_prob:
+            # Apply frequency masking
+            melspec = self.freq_mask(melspec)
+
+        if self.time_mask is not None and torch.rand(1).item() < self.spec_aug_prob:
+            # Apply time masking
+            melspec = self.time_mask(melspec)
 
         return melspec, transcript_ids
     

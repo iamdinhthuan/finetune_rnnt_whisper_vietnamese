@@ -17,7 +17,7 @@ from models.jointer import Jointer
 
 from config import get_config
 from utils.dataset import AudioDataset, collate_fn
-from utils.scheduler import WarmupLR
+from utils.scheduler import WarmupLR, CosineAnnealingWarmupLR
 from utils.model_checkpoint import StepBasedModelCheckpoint
 
 class StreamingRNNT(pl.LightningModule):
@@ -61,12 +61,13 @@ class StreamingRNNT(pl.LightningModule):
         self.loss = warprnnt_numba.RNNTLossNumba(
             blank=config.tokenizer.rnnt_blank, reduction="mean",
         )
-        # self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
+        # Enhanced optimizer with weight decay
         self.optimizer = torch.optim.AdamW(
             self.parameters(),
             lr=config.training.optimizer.lr,
             betas=config.training.optimizer.betas,
-            eps=config.training.optimizer.eps
+            eps=config.training.optimizer.eps,
+            weight_decay=getattr(config.training.optimizer, 'weight_decay', 0.01)
         )
         
     
@@ -217,15 +218,28 @@ class StreamingRNNT(pl.LightningModule):
         return super().on_train_epoch_end()
 
     def configure_optimizers(self):
-        return (
-            [self.optimizer],
-            # Change total steps to any number you want (should be total_samples/batch_size * epochs)
-            [{"scheduler": WarmupLR(
+        # Choose scheduler based on config
+        scheduler_type = getattr(self.config.training.scheduler, 'type', 'linear')
+
+        if scheduler_type == 'cosine_annealing':
+            scheduler = CosineAnnealingWarmupLR(
+                self.optimizer,
+                self.config.training.scheduler.warmup_steps,
+                self.config.training.scheduler.total_steps,
+                getattr(self.config.training.scheduler, 'min_lr_ratio', 0.1)
+            )
+        else:
+            # Default to linear warmup + exponential decay
+            scheduler = WarmupLR(
                 self.optimizer,
                 self.config.training.scheduler.warmup_steps,
                 self.config.training.scheduler.total_steps,
                 self.config.training.optimizer.min_lr
-            ), "interval": "step"}],
+            )
+
+        return (
+            [self.optimizer],
+            [{"scheduler": scheduler, "interval": "step"}],
         )
 
 # Load configuration
@@ -299,7 +313,12 @@ trainer = pl.Trainer(
     logger=pl.loggers.TensorBoardLogger(config.paths.log_dir),
     num_sanity_val_steps=0, # At the start, the model produced garbage predictions anyway. Should only be > 0 for testing
     val_check_interval=config.model_saving.save_every_n_steps,  # Run validation every N steps to get val_wer
-    check_val_every_n_epoch=None  # Disable epoch-based validation, use step-based instead
+    check_val_every_n_epoch=None,  # Disable epoch-based validation, use step-based instead
+
+    # Enhanced training settings
+    accumulate_grad_batches=getattr(config.training, 'accumulate_grad_batches', 1),
+    gradient_clip_val=getattr(config.training, 'gradient_clip_val', None),
+    gradient_clip_algorithm=getattr(config.training, 'gradient_clip_algorithm', 'norm')
 )
 
 if __name__ == "__main__":

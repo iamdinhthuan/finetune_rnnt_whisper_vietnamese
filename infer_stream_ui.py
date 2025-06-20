@@ -102,8 +102,8 @@ class StreamingTranscriber:
         """Reset tất cả cache cho phiên mới"""
         self.audio_cache = torch.zeros(240, device=self.device)
         self.conv1_cache = torch.zeros(1, 80, 1, device=self.device)
-        self.conv2_cache = torch.zeros(1, 768, 1, device=self.device)
-        self.conv3_cache = torch.zeros(1, 768, 1, device=self.device)
+        self.conv2_cache = torch.zeros(1, config.model.whisper.n_state, 1, device=self.device)
+        self.conv3_cache = torch.zeros(1, config.model.whisper.n_state, 1, device=self.device)
         self.k_cache = torch.zeros(config.model.whisper.n_layer, 1, config.model.attention_context_size[0], config.model.whisper.n_state, device=self.device)
         self.v_cache = torch.zeros(config.model.whisper.n_layer, 1, config.model.attention_context_size[0], config.model.whisper.n_state, device=self.device)
         self.cache_len = torch.zeros(1, dtype=torch.int, device=self.device)

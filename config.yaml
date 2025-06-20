@@ -35,21 +35,29 @@ dataset:
 
 # Training Parameters
 training:
-  batch_size: 32
+  batch_size: 64  # Reduced for better gradients
+  accumulate_grad_batches: 1  # Effective batch size = 32
   num_workers: 16
   max_epochs: 50
-  
+
+  # Gradient clipping for stability
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: "norm"
+
   # Optimizer settings
   optimizer:
-    lr: 1e-4
-    min_lr: 1e-5
-    betas: [0.9, 0.98]
-    eps: 1e-9
-  
-  # Scheduler settings
+    lr: 3e-5  # Lower for fine-tuning stability
+    min_lr: 1e-6  # Lower minimum
+    betas: [0.9, 0.999]  # Standard Adam betas
+    eps: 1e-8
+    weight_decay: 0.01  # Add weight decay for regularization
+
+  # Enhanced scheduler settings
   scheduler:
-    total_steps: 3000000
-    warmup_steps: 2000
+    type: "cosine_annealing"  # Better than linear
+    total_steps: 100000  # Adjust based on your data size
+    warmup_steps: 5000  # More warmup for stability
+    min_lr_ratio: 0.1
 
 # Tokenizer Configuration
 tokenizer:
@@ -66,7 +74,7 @@ paths:
 # Model Saving Strategy (Step-based with WER selection)
 model_saving:
   # Save model every N training steps
-  save_every_n_steps: 1000
+  save_every_n_steps: 10000
   
   # Keep only the top K models based on WER
   keep_top_k: 3

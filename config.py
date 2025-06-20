@@ -52,19 +52,25 @@ class OptimizerConfig:
     min_lr: float = 1e-5
     betas: tuple = (0.9, 0.98)
     eps: float = 1e-9
+    weight_decay: float = 0.01
 
 @dataclass
 class SchedulerConfig:
     """Learning rate scheduler configuration."""
     total_steps: int = 3000000
     warmup_steps: int = 2000
+    type: str = "linear"  # "linear" or "cosine_annealing"
+    min_lr_ratio: float = 0.1
 
 @dataclass
 class TrainingConfig:
     """Training configuration."""
     batch_size: int = 32
+    accumulate_grad_batches: int = 1
     num_workers: int = 16
     max_epochs: int = 50
+    gradient_clip_val: Optional[float] = None
+    gradient_clip_algorithm: str = "norm"
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
 
@@ -206,7 +212,8 @@ class ConfigManager:
                     'lr': float(opt_dict.get('lr', 1e-4)),
                     'min_lr': float(opt_dict.get('min_lr', 1e-5)),
                     'betas': tuple(opt_dict.get('betas', [0.9, 0.98])),
-                    'eps': float(opt_dict.get('eps', 1e-9))
+                    'eps': float(opt_dict.get('eps', 1e-9)),
+                    'weight_decay': float(opt_dict.get('weight_decay', 0.01))
                 }
                 optimizer_config = OptimizerConfig(**opt_dict)
             
@@ -215,15 +222,20 @@ class ConfigManager:
                 # Ensure proper types for scheduler config
                 sched_dict = {
                     'total_steps': int(sched_dict.get('total_steps', 3000000)),
-                    'warmup_steps': int(sched_dict.get('warmup_steps', 2000))
+                    'warmup_steps': int(sched_dict.get('warmup_steps', 2000)),
+                    'type': str(sched_dict.get('type', 'linear')),
+                    'min_lr_ratio': float(sched_dict.get('min_lr_ratio', 0.1))
                 }
                 scheduler_config = SchedulerConfig(**sched_dict)
             
             # Remove nested configs from training_dict and ensure proper types
             training_dict_clean = {
                 'batch_size': int(training_dict.get('batch_size', 32)),
+                'accumulate_grad_batches': int(training_dict.get('accumulate_grad_batches', 1)),
                 'num_workers': int(training_dict.get('num_workers', 16)),
-                'max_epochs': int(training_dict.get('max_epochs', 50))
+                'max_epochs': int(training_dict.get('max_epochs', 50)),
+                'gradient_clip_val': training_dict.get('gradient_clip_val'),
+                'gradient_clip_algorithm': str(training_dict.get('gradient_clip_algorithm', 'norm'))
             }
 
             config.training = TrainingConfig(
