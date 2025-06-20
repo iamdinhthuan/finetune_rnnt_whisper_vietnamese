@@ -1,0 +1,30 @@
+# Core ML frameworks
+torch>=2.0.0
+pytorch-lightning>=2.0.0
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Text processing
+sentencepiece>=0.1.99
+
+# RNN-T loss
+warprnnt-numba>=0.7.0
+
+# Utilities
+loguru>=0.7.0
+tqdm>=4.65.0
+numpy>=1.24.0
+pyyaml>=6.0
+
+# Data handling
+audioread>=3.0.0
+
+# UI demo (optional)
+gradio>=3.40.0
+
+# Development tools (optional)
+jupyter>=1.0.0
+matplotlib>=3.7.0
+tensorboard>=2.13.0

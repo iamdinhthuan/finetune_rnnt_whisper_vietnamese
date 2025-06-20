@@ -1,0 +1,118 @@
+# Whisper RNN-T Configuration File
+# Configuration for Whisper Base model with RNN-T decoder
+
+# Audio Processing Settings
+audio:
+  sample_rate: 16000
+  n_fft: 400
+  hop_length: 160
+  n_mels: 80
+
+# Model Architecture (Whisper Base)
+model:
+  whisper:
+    n_state: 512      # Whisper Base: 512 (vs Small: 768)
+    n_head: 8         # Whisper Base: 8 (vs Small: 12)
+    n_layer: 6        # Whisper Base: 6 (vs Small: 12)
+  attention_context_size: [80, 3]
+
+# Dataset Configuration
+dataset:
+  # Duration filtering (seconds)
+  max_duration: 15.1
+  min_duration: 0.9
+  
+  # Text length filtering (characters)
+  min_text_len: 3
+  max_text_len: 200
+  
+  # Data paths
+  train_manifest: ["./data/sample.jsonl"]
+  val_manifest: ["./data/sample.jsonl"]
+  
+  # Background noise paths for augmentation (optional)
+  bg_noise_paths: []
+
+# Training Parameters
+training:
+  batch_size: 32
+  num_workers: 16
+  max_epochs: 50
+  
+  # Optimizer settings
+  optimizer:
+    lr: 1e-4
+    min_lr: 1e-5
+    betas: [0.9, 0.98]
+    eps: 1e-9
+  
+  # Scheduler settings
+  scheduler:
+    total_steps: 3000000
+    warmup_steps: 2000
+
+# Tokenizer Configuration
+tokenizer:
+  vocab_size: 1024
+  model_path: './utils/tokenizer_spe_bpe_v1024_pad/tokenizer.model'
+  rnnt_blank: 1024
+  pad_token: 1
+
+# File Paths
+paths:
+  pretrained_encoder_weight: './weights/base_encoder.pt'
+  log_dir: './checkpoints'
+
+# Model Saving Strategy (Step-based with WER selection)
+model_saving:
+  # Save model every N training steps
+  save_every_n_steps: 1000
+  
+  # Keep only the top K models based on WER
+  keep_top_k: 3
+  
+  # Metric to monitor for model selection
+  monitor_metric: 'val_wer'  # 'val_wer' or 'val_loss'
+  mode: 'min'  # 'min' for WER/loss, 'max' for accuracy
+  
+  # Save only model weights (not full checkpoint) to reduce storage
+  save_weights_only: true
+  
+  # Filename template for saved models
+  filename_template: 'rnnt-step-{step:06d}-wer-{val_wer:.4f}'
+
+# Greedy Decoding Parameters
+decoding:
+  max_symbols: 3
+
+# Augmentation Settings (optional)
+augmentation:
+  enabled: true          # Giữ nguyên
+
+  # ---- Gain ----------------------
+  gain:
+    enabled: true
+    prob: 0.8            # từ 0.9 -> 0.8
+    min_gain_db: -10     # từ -25 -> -10
+    max_gain_db:  6      # từ +10 -> 6
+
+  # ---- Pitch shift ---------------
+  pitch_shift:
+    enabled: true
+    prob: 0.3            # từ 0.2 -> 0.3
+    min_semitones: -4
+    max_semitones:  4
+
+  # ---- Background noise ----------
+  background_noise:
+    enabled: true
+    prob: 0.3            # từ 0.9 -> 0.3
+    min_snr_db: 8.0      # từ 1.0 -> 8.0
+    max_snr_db: 20.0     # từ 5.0 -> 20.0
+
+  # ---- Gaussian noise ------------
+  gaussian_noise:
+    enabled: true
+    prob: 1.0            # luôn chạy khi nhánh noise được chọn
+    min_amplitude: 0.001
+    max_amplitude: 0.010
